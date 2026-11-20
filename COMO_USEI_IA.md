@@ -3,6 +3,7 @@
 ## Sugestões aceitas                         
 
 - Separar a requisição da paginação: mantive `buscar_pagina` para consultar uma página e tratar erros HTTP e de conexão, e `buscar_todas_as_paginas` para percorrer até `total_pages`. 
+- Usar `datetime.strptime` para interpretar os dois formatos de data e `Decimal` para evitar erros de float em valores monetários.
 
 ## Sugestões rejeitadas
 

@@ -1,3 +1,4 @@
 errata-desafio-final.pdf
-.env
 brutos/
+*env
+etl/__pycache__/
