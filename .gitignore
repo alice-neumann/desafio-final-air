@@ -1,4 +1,4 @@
-errata-desafio-final.pdf
 brutos/
 *env
 __pycache__/
+.pytest_cache
