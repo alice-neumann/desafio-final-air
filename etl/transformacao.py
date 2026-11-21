@@ -85,20 +85,50 @@ def tratar_valor_total_divergente(pedido):
 
     return pedido_tratado
 
-# Contadores
-clientes = carregar_brutos('clientes')
-pedidos = carregar_brutos('pedidos')
-pedidos_unicos, repetidos_descartados = tratar_pedidos_repetidos(pedidos)
+# A4 para tabela produto
+def tratar_produto(produto):
+    produto_tratado = produto.copy()
+    produto_tratado['produto_id'] = int(produto_tratado['produto_id'])
+    produto_tratado['preco_base'] = Decimal(produto_tratado['preco_base']).quantize(Decimal('0.01'))
+    return produto_tratado
 
-clientes_tratados = [tratar_sigla_estados(tratar_email_cliente(c)) for c in clientes]
-pedidos_tratados = [
-    tratar_valor_total_divergente(tratar_valor_total_pedido(tratar_data_pedido(p)))
-    for p in pedidos_unicos
-]
+def tratar_itens_pedido(pedido):
+    pedido_tratado = pedido.copy()
+    pedido_tratado['itens'] = [
+        {
+            **item,
+            'linha': linha,
+            'preco_unitario': Decimal(str(item['preco_unitario'])).quantize(Decimal('0.01')),
+        }
+        for linha, item in enumerate(pedido['itens'], start=1)
+    ]
+    return pedido_tratado
 
-print(f"emails_nulos={sum(c['email'] is None for c in clientes_tratados)}")                  
-print(f"estados_corrigidos={sum(a['estado'] != b['estado'] for a, b in zip(clientes, clientes_tratados))}")  
-print(f"datas_convertidas={sum('/' in p['data_pedido'] for p in pedidos_unicos)}")           
-print(f"valores_convertidos={sum(isinstance(p['valor_total'], str) for p in pedidos_unicos)}")  
-print(f"repetidos_descartados={repetidos_descartados}")                                       
-print(f"divergentes={sum(p['divergente'] for p in pedidos_tratados)}")                        
+def transformar_tudo():
+    produtos = [tratar_produto(p) for p in carregar_brutos('produtos')]
+
+    clientes_brutos = carregar_brutos('clientes')
+    clientes = [tratar_sigla_estados(tratar_email_cliente(c)) for c in clientes_brutos]
+
+    pedidos_brutos = carregar_brutos('pedidos')
+    pedidos_unicos, repetidos_descartados = tratar_pedidos_repetidos(pedidos_brutos)
+    pedidos = [
+        tratar_itens_pedido(
+            tratar_valor_total_divergente(
+                tratar_valor_total_pedido(tratar_data_pedido(p))
+            )
+        )
+        for p in pedidos_unicos
+    ]
+
+    emails_nulos = sum(cliente['email'] is None for cliente in clientes)
+    estados_padronizados = sum(
+        bruto['estado'] != tratado['estado']
+        for bruto, tratado in zip(clientes_brutos, clientes)
+    )
+    datas_convertidas = sum('/' in pedido['data_pedido'] for pedido in pedidos_unicos)
+    valores_convertidos = sum(isinstance(pedido['valor_total'], str) for pedido in pedidos_unicos)
+    print(f'transformacao: pedidos_unicos={len(pedidos_unicos)} repetidos_descartados={repetidos_descartados}')
+    print(f'transformacao: emails_nulos={emails_nulos} estados_padronizados={estados_padronizados} datas_convertidas={datas_convertidas} valores_convertidos={valores_convertidos}')
+
+    return produtos, clientes, pedidos   
