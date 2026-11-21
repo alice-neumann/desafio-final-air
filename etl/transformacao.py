@@ -25,12 +25,8 @@ def tratar_email_cliente(cliente):
 # A2
 def tratar_sigla_estados(cliente):
     cliente_tratado = cliente.copy()
-    estado = cliente_tratado.get('estado')
+    cliente_tratado['estado'] = cliente['estado'].strip().upper()
 
-    if isinstance(estado, str):
-        estado = estado.strip().upper()
-
-    cliente_tratado['estado'] = estado or None
     return cliente_tratado
 
 # A3
