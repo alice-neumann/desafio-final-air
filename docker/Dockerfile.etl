@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copia o codigo do pipeline e insumos necessarios (ex: produtos.csv)
+COPY etl /app/etl
+COPY insumos /app/insumos
+
+CMD ["python", "etl/main.py"]
