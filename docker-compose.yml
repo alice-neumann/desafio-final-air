@@ -34,6 +34,8 @@ services:
       context: .
       dockerfile: docker/Dockerfile.etl
     container_name: verdejar-etl
+    volumes:
+      - ./brutos:/app/brutos
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
