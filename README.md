@@ -113,7 +113,7 @@ O Docker Compose irá automaticamente:
 2. Subir o PostgreSQL na porta `5433` e aplicar o `insumos/schema.sql`;
 3. Construir e iniciar a API local em `http://127.0.0.1:8000`;
 4. Aguardar o *healthcheck* de ambos os serviços responderem com sucesso;
-5. Construir e executar o contêiner do ETL (`etl/main.py`), exibindo todas as mensagens e contadores diretamente no terminal.
+5. Construir e executar o contêiner do ETL (`etl/main.py`), exibindo todas as mensagens e contadores diretamente no terminal. Os dados brutos ficam disponíveis em `./brutos` no seu computador (volume `./brutos:/app/brutos`).
 
 Para testar a **idempotência** (executar o ETL uma segunda vez com os serviços já ligados):
 
@@ -142,6 +142,7 @@ python -m venv .venv
 # Linux / macOS
 source .venv/bin/activate
 ```
+
 
 #### 2. Instalar as dependências
 
@@ -185,10 +186,16 @@ python main.py
 
 #### 6. Rodar os testes automatizados
 
-Com o banco de dados ativo (necessário para o teste de reconciliação):
+Volte para a raiz do projeto (`cd ..`). Os testes de reconciliação comparam a origem com o banco e leem a pasta `brutos/`, então rode o ETL (passo 5) **antes**, com o banco ativo:
 
 ```bash
 python -m pytest -v
+```
+
+Para rodar só os testes unitários de transformação (sem banco e sem ETL prévio):
+
+```bash
+python -m pytest tests/test_transformacao.py -v
 ```
 
 ---
@@ -203,6 +210,28 @@ python -m pytest -v
 | Biblioteca Python | `psycopg` v3 (`psycopg[binary]`) |
 
 ---
+
+## Ver as tabelas no pgAdmin (opcional)
+
+Com o banco no ar (`docker compose up -d db` ou `docker compose up --build`), é possível conferir as tabelas no pgAdmin instalado no computador:
+
+1. No pgAdmin, clique com o botão direito em **Servers** e escolha **Register → Server...**.
+2. Aba **General**: em *Name*, escreva um nome qualquer (por exemplo, `verdejar`).
+3. Aba **Connection**, preenchendo com os valores do seu `.env`:
+   | Campo no pgAdmin | Valor |
+   |---|---|
+   | Host name/address | `localhost` |
+   | Port | `5433` |
+   | Maintenance database | valor de `POSTGRES_DB` (`verdejar`) |
+   | Username | valor de `POSTGRES_USER` (`postgres`) |
+   | Password | valor de `POSTGRES_PASSWORD` |
+
+4. Clique em **Save**.
+5. As tabelas ficam em **Servers → verdejar → Databases → verdejar → Schemas → public → Tables**: `clientes`, `itens_pedido`, `pedidos` e `produtos`.
+
+Observações:
+- A porta é `5433` (a do Compose), e não a `5432`, que pode estar em uso por um PostgreSQL instalado localmente.
+- As tabelas existem assim que o banco sobe (o `schema.sql` é aplicado na criação), mas só terão linhas depois de executar o ETL.
 
 ## Armadilhas tratadas (A1 a A6)
 
@@ -302,6 +331,8 @@ tests/test_transformacao.py::test_a4_valor_numerico_float PASSED                
 tests/test_transformacao.py::test_a5_pedidos PASSED                                                         [ 84%]
 tests/test_transformacao.py::test_a6_pedido_sem_divergencia PASSED                                          [ 92%]
 tests/test_transformacao.py::test_a6_pedido_com_divergencia PASSED                                          [100%]
+
+============================================ 13 passed in 0.32s ==================================================
 ```
 
 ---
@@ -309,6 +340,11 @@ tests/test_transformacao.py::test_a6_pedido_com_divergencia PASSED              
 ## Consultas SQL de validação
 
 As três consultas obrigatórias estão no arquivo `consultas_validacao.sql`.
+
+Decisões de definição:
+- "Vendas" exclui pedidos cancelados (`status NOT ILIKE 'cancelado'`). Os cancelados continuam carregados no banco, o filtro fica só na consulta.
+- O total soma `valor_itens` (a soma dos itens do pedido), e não `valor_total`. Nos pedidos divergentes os dois diferem.
+- As consultas (b) e (c) não filtram por status: contam todos os pedidos (5000) e todos os divergentes (238), para bater com os contadores do ETL.
 
 ### (a) Total de vendas por mês
 
@@ -331,6 +367,15 @@ As três consultas obrigatórias estão no arquivo `consultas_validacao.sql`.
 ```
 soma_dos_meses   soma_geral   bate
    247462.32	  247462.32   true
+```
+
+### Teste adicional: vendas + cancelados = soma geral de toda a tabela
+
+O teste acima usa o mesmo filtro nos dois lados. Este fecha com a tabela inteira: a soma das vendas (sem cancelados) mais a soma dos cancelados deve ser igual à soma de `valor_itens` de todos os pedidos, que é o mesmo valor da reconciliação do ETL.
+
+```
+vendas        cancelados   soma_geral    bate
+247462.32     63766.43     311228.75     true
 ```
 
 ### (b) Quantidade de pedidos por estado
@@ -359,25 +404,19 @@ Total rows: 238
 
 ---
 
+## Observações sobre os dados e os insumos
+
+- **Pedido com valor_total negativo:** o pedido 81 tem `valor_total = -1.84` (a soma dos itens é 3.16). É o único caso nos dados e não é uma das armadilhas declaradas. O ETL não descarta o pedido, ele é carregado como veio e marcado como divergente.
+- **Insumo alterado:** em `insumos/api_verdejar.py`, a API passou a escutar em `0.0.0.0` (antes `127.0.0.1`), para aceitar conexões da rede interna do Docker no Compose. Na execução manual isso também a expõe na rede local; os dados são sintéticos. O restante dos insumos (`schema.sql`, dados) não foi alterado.
+
+---
+
 ## Stretch: Orquestração local com Docker Compose
 
-Foi implementada a **Orquestração local com Docker** através do arquivo `docker-compose.yml`, permitindo subir todo o ambiente e executar o ETL com um único comando:
+Item de Stretch escolhido: **orquestração local com Docker**. O `docker-compose.yml` sobe o PostgreSQL, a API e o ETL com um único comando (`docker compose up --build`, descrito na Opção 1).
 
-- **Serviços orquestrados:**
-  1. `db`: sobe o PostgreSQL 16 (porta 5433 no host), aplicando automaticamente o `insumos/schema.sql` através do ponto de entrada `/docker-entrypoint-initdb.d/`. Possui *healthcheck* com `pg_isready`.
-  2. `api`: constrói a imagem a partir de `docker/Dockerfile.api`, expondo a porta 8000 com *healthcheck* na rota `/saude`.
-  3. `etl`: constrói a imagem a partir de `docker/Dockerfile.etl`. Utiliza `depends_on` com condição `service_healthy`, garantindo que o pipeline só inicia após o banco e a API estarem completamente prontos.
+- `db`: PostgreSQL 16 na porta 5433; aplica o `insumos/schema.sql` na criação e tem *healthcheck* (`pg_isready`).
+- `api`: imagem de `docker/Dockerfile.api`, porta 8000, com *healthcheck* em `/saude`.
+- `etl`: imagem de `docker/Dockerfile.etl`; `depends_on` com `service_healthy` faz o ETL iniciar só com banco e API prontos, e os brutos são gravados em `./brutos`.
 
-### Execução com um único comando:
-
-```bash
-docker compose up --build
-```
-
-### Comprovação da idempotência via Compose:
-
-Com os serviços `db` e `api` já ativos, para executar o pipeline uma segunda vez sem reiniciar os serviços:
-
-```bash
-docker compose run --rm etl
-```
+Idempotência pelo Compose: `docker compose run --rm etl` repete a carga e mantém as mesmas contagens.
