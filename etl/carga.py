@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from decimal import Decimal
 import psycopg
@@ -6,20 +7,28 @@ RAIZ_PROJETO = Path(__file__).resolve().parent.parent
 
 def ler_env():
     env = {}
-    for linha in (RAIZ_PROJETO / '.env').read_text().splitlines():
-        if '=' in linha and not linha.startswith('#'):
-            chave, valor = linha.split('=', 1)
-            env[chave.strip()] = valor.strip()
+    caminho_env = RAIZ_PROJETO / '.env'
+    if caminho_env.exists():
+        for linha in caminho_env.read_text().splitlines():
+            if '=' in linha and not linha.startswith('#'):
+                chave, valor = linha.split('=', 1)
+                env[chave.strip()] = valor.strip()
     return env
 
 def conectar():
     env = ler_env()
+    host = os.getenv('POSTGRES_HOST', env.get('POSTGRES_HOST', 'localhost'))
+    port = int(os.getenv('POSTGRES_PORT', env.get('POSTGRES_PORT', 5433)))
+    dbname = os.getenv('POSTGRES_DB', env.get('POSTGRES_DB'))
+    user = os.getenv('POSTGRES_USER', env.get('POSTGRES_USER'))
+    password = os.getenv('POSTGRES_PASSWORD', env.get('POSTGRES_PASSWORD'))
+
     return psycopg.connect(
-        host='localhost',
-        port = 5433,
-        dbname=env['POSTGRES_DB'],
-        user=env['POSTGRES_USER'],
-        password=env['POSTGRES_PASSWORD']
+        host=host,
+        port=port,
+        dbname=dbname,
+        user=user,
+        password=password
     )
 
 def limpar_tabelas(cursor):
@@ -72,8 +81,8 @@ def contar_tabelas(cursor, pedidos):
     ).quantize(Decimal('0.01'))
 
     print(
-        f'carga: clientes={contagens['clientes']} produtos={contagens['produtos']} '
-        f'pedidos={contagens['pedidos']} itens={contagens['itens_pedido']}'
+        f"carga: clientes={contagens['clientes']} produtos={contagens['produtos']} "
+        f"pedidos={contagens['pedidos']} itens={contagens['itens_pedido']}"
     )
     print(
         f'reconciliacao: soma_valor_itens_origem={soma_origem:.2f} '
@@ -91,6 +100,3 @@ def carregar_tudo(produtos, clientes, pedidos):
             carregar_pedidos(cursor, pedidos)
             carregar_itens_pedido(cursor, pedidos)
             contar_tabelas(cursor, pedidos)
-
-
-         

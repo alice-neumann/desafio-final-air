@@ -1,10 +1,11 @@
 import csv
 import json
+import os
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 from pathlib import Path
 
-BASE_URL = 'http://127.0.0.1:8000'
+BASE_URL = os.getenv('API_BASE_URL', 'http://127.0.0.1:8000')
 
 def buscar_pagina(rota, pagina, tamanho=50):
     url = f'{BASE_URL}/{rota}?page={pagina}&page_size={tamanho}'

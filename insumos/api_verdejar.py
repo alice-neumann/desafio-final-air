@@ -57,7 +57,7 @@ def main():
         with open(os.path.join(a.dados, f"{nome}.json"), encoding="utf-8") as f:
             DADOS[nome] = json.load(f)
     print(f"API Verdejar em http://127.0.0.1:{a.porta}  (clientes={len(DADOS['clientes'])}, pedidos={len(DADOS['pedidos'])})")
-    HTTPServer(("127.0.0.1", a.porta), Handler).serve_forever()
+    HTTPServer(("0.0.0.0", a.porta), Handler).serve_forever()
 
 if __name__ == "__main__":
     main()
