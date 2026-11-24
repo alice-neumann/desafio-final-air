@@ -63,11 +63,18 @@ Você pode executar o projeto de duas formas:
 
 ---
 
-### 1. Pré-requisitos gerais
+### 1. Pré-requisitos
 
-- Docker Desktop instalado e em execução
-- Python 3.10 ou superior
-- Git
+**Opção 1 - Executar com Docker Compose**
+
+- Docker Desktop instalado e em execução (Windows/macOS), ou Docker Engine com Docker Compose (Linux).
+- Git (caso vá clonar o repositório).
+
+**Opção 2 - Executar manualmente ou rodar os testes**
+
+- Python 3.10 ou superior e `pip`.
+- Docker Desktop (Windows/macOS) ou Docker Engine com Docker Compose (Linux), pois o PostgreSQL é executado em um contêiner.
+- Git (caso vá clonar o repositório).
 
 ---
 
