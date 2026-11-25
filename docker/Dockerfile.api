@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copia os dados e a API fornecidos
+COPY insumos /app/insumos
+
+EXPOSE 8000
+
+CMD ["python", "insumos/api_verdejar.py", "--porta", "8000", "--dados", "insumos/dados"]
