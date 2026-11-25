@@ -131,7 +131,7 @@ docker compose run --rm etl
 Para encerrar os serviços quando terminar:
 
 ```bash
-docker compose down
+docker compose down -v
 ```
 
 ---
